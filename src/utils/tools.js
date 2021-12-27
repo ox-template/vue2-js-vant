@@ -3,6 +3,21 @@
 */
 
 /**
+ * 深克隆
+ * @data 数据
+*/
+export const deepClone = function (data) {
+  let result = data
+  if (typeof data === 'object' && data !== null) {
+    result = Object.prototype.toString.call(data) === '[object Array]' ? [] : {}
+    for (const prop in data) {
+      result[prop] = deepClone(data[prop])
+    }
+  }
+  return result
+}
+
+/**
  * 节流
  * @fn 执行的函数
  * @delay 间隔时间
