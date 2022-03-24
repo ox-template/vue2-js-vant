@@ -3,9 +3,14 @@ import axios from 'axios'
 import Cookies from 'js-cookie'
 import { Toast } from 'vant'
 import { successStatus, errorStatus, successCodes, errorCodes } from './httpStatus'
+import { RequestQueue } from '@/utils/tools'
 
+// config
 const TIME_OUT = 60 // 默认接口请求延迟，单位：秒
 const loginPath = '/login' // 登录页路由
+const serverStatusKey = 'status' // 服务状态码key
+
+const requestQueue = new RequestQueue() // 请求队列
 
 const service = axios.create({
   baseURL: process.env.VUE_APP_BASE_API,
@@ -14,10 +19,15 @@ const service = axios.create({
 
 service.interceptors.request.use(
   (config) => {
-    Toast.loading({ duration: 0, forbidClick: true })
+    // 配置是否显示loading
+    if (config.loading !== false) {
+      Toast.loading({ duration: 0, forbidClick: true })
+    }
     if (Cookies.get('AuthenToken')) {
       config.headers.Authorization = Cookies.get('AuthenToken')
     }
+    // 入队列
+    requestQueue.insert(config.baseURL + config.url)
     return config
   },
   (error) => {
@@ -27,19 +37,23 @@ service.interceptors.request.use(
 )
 
 service.interceptors.response.use(
+  // http状态码正常
   (response) => {
+    // 出队列
+    requestQueue.out(response.config.baseURL + response.config.url)
+    if (requestQueue.isClear()) {
+      Toast.clear()
+    }
     const httpStatus = response.status ? Number(response.status) : 0
-    const serviceStatus = response.data.status ? Number(response.data.status) : 0
+    const serviceStatus = response.data[serverStatusKey] ? Number(response.data[serverStatusKey]) : 0
     const responseData = response.data ?? {}
-    Toast.clear()
-    // Http状态码正常
     if (successCodes.includes(httpStatus)) {
       // 服务状态码正常
       if (successCodes.includes(serviceStatus)) {
         return Promise.resolve(responseData.data)
       } else {
         // 服务状态码异常
-        const message = responseData.message ? `ErrorCode:${responseData.code},${responseData.message}` : successStatus[1]
+        const message = responseData.message ? `ErrorCode:${responseData.code},${responseData.message}` : errorStatus[1]
         Toast.fail(message)
         return Promise.reject(responseData)
       }
@@ -47,9 +61,13 @@ service.interceptors.response.use(
   },
   // Http状态码异常
   (error) => {
+    // 出队列
+    requestQueue.out(error.config.baseURL + error.config.url)
+    if (requestQueue.isClear()) {
+      Toast.clear()
+    }
     const errorData = error.response || {}
     const httpStatus = errorData.status ? Number(errorData.status) : 0
-    Toast.clear()
     // 登录失效
     if (httpStatus === 401) {
       Toast(errorStatus[httpStatus])

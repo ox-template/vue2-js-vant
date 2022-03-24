@@ -45,3 +45,27 @@ export const deBounce = function (fn, delay = 1000) {
   if (deBounceTimer !== null) clearTimeout(deBounceTimer)
   deBounceTimer = setTimeout(fn, delay)
 }
+
+/**
+ * 请求队列
+ * @fn
+ */
+export class RequestQueue {
+  queue = []
+  insert (item) {
+    this.queue.push(item)
+  }
+
+  out (item) {
+    const index = this.queue.indexOf(item)
+    this.queue.splice(index, 1)
+  }
+
+  clear () {
+    this.queue = []
+  }
+
+  isClear () {
+    return this.queue.length <= 0
+  }
+}
